@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # /// script
-# dependencies = ["libcst==1.8.6"]
+# dependencies = ["libcst==1.8.6", "tqdm>=4.0"]
 # requires-python = "==3.11.*"
 # ///
 
@@ -18,6 +18,7 @@ import glob
 import os
 
 import libcst as cst
+from tqdm import tqdm
 
 
 def get_assert_statement(line: cst.SimpleStatementLine) -> cst.Assert | None:
@@ -136,13 +137,13 @@ def transform_folder(directory_root: str):
     total_changes = 0
     num_changed_files = 0
 
-    for filepath in test_files:
+    for filepath in tqdm(test_files, desc="Processing test files", unit="file"):
         num_changes = transform_file(filepath)
         if num_changes > 0:
             relpath = os.path.relpath(filepath, directory_root)
             num_changed_files += 1
             total_changes += num_changes
-            print(f"  Changed {num_changes} assert(s) in {relpath}")
+            tqdm.write(f"  Changed {num_changes} assert(s) in {relpath}")
 
     print(f"\nTotal: {total_changes} assertions converted in {num_changed_files} files")
 
