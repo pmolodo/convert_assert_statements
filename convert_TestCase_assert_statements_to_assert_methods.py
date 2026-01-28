@@ -52,7 +52,10 @@ class AssertEqualTransformer(cst.CSTTransformer):
 
     def visit_FunctionDef(self, _node: cst.FunctionDef) -> bool:
         if self.in_test_class:
-            self.in_method = True
+            # only convert inside normal methods, not classmethods or staticmethods
+            params = _node.params.params
+            if params and params[0].name.value == "self":
+                self.in_method = True
         return True
 
     def leave_FunctionDef(self, _original: cst.FunctionDef, updated: cst.FunctionDef) -> cst.FunctionDef:
