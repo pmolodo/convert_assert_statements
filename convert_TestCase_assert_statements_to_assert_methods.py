@@ -62,6 +62,31 @@ class AssertEqualTransformer(cst.CSTTransformer):
         self.in_method = False
         return updated
 
+    def _strip_line_continuation(
+        self, ws: cst.BaseParenthesizableWhitespace
+    ) -> cst.BaseParenthesizableWhitespace:
+        """Remove line continuation character from SimpleWhitespace if present.
+        """
+        if isinstance(ws, cst.SimpleWhitespace):
+            value = ws.value.replace("\r\n", "\n")
+            # Check for backslash-newline sequences embedded in the string
+            if "\\\n" in value:
+                # SimpleWhitespace can't contain newlines, so convert to
+                # ParenthesizedWhitespace. The last line is the indentation.
+                before_newline, after_newline = value.rsplit("\\\n", 1)
+                # strip trailing whitespace, that was before continuation backslash
+                before_newline = before_newline.rstrip()
+
+                return cst.ParenthesizedWhitespace(
+                    first_line=cst.TrailingWhitespace(
+                        whitespace=cst.SimpleWhitespace(before_newline),
+                        newline=cst.Newline(),
+                    ),
+                    indent=False,
+                    last_line=cst.SimpleWhitespace(after_newline),
+                )
+        return ws
+
     def _node_to_string(self, node: cst.BaseExpression) -> str:
         """Convert a CST node to its string representation."""
         return cst.parse_module("").code_for_node(node)
@@ -90,12 +115,31 @@ class AssertEqualTransformer(cst.CSTTransformer):
         if not isinstance(comp.operator, cst.Equal):
             return updated
 
-        # Build self.assertEqual(left, right)
+        # Build self.assertEqual(left, right) preserving original whitespace
         left = test.left
         right = comp.comparator
         message = assert_statement.msg
 
-        args = [cst.Arg(value=left), cst.Arg(value=right)]
+        # Try to preserve original whitespace from assert statement, except we
+        # strip line continuation characters since they're not needed inside
+        # parentheses.
+
+        # first arg is left, with new whitespace after comma the same as old
+        # whitespace after ==
+        first_arg = cst.Arg(value=left,
+            comma=cst.Comma(whitespace_after=self._strip_line_continuation(comp.operator.whitespace_after)))
+
+        # second arg is right; if original assert had a message, use the same
+        # whitepace after comma
+        if message and isinstance(assert_statement.comma, cst.Comma):
+            # Get whitespace after the comma (before message) from original assert
+            comma = assert_statement.comma.with_changes(
+                whitespace_after=self._strip_line_continuation(assert_statement.comma.whitespace_after))
+            second_arg = cst.Arg(value=right, comma=comma)
+        else:
+            second_arg = cst.Arg(value=right)
+
+        args = [first_arg, second_arg]
         if message:
             args.append(cst.Arg(value=message))
 
