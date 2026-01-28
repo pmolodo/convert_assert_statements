@@ -93,16 +93,18 @@ class AssertEqualTransformer(cst.CSTTransformer):
         # Build self.assertEqual(left, right)
         left = test.left
         right = comp.comparator
+        message = assert_statement.msg
+
+        args = [cst.Arg(value=left), cst.Arg(value=right)]
+        if message:
+            args.append(cst.Arg(value=message))
 
         new_call = cst.Call(
             func=cst.Attribute(
                 value=cst.Name("self"),
                 attr=cst.Name("assertEqual"),
             ),
-            args=[
-                cst.Arg(value=left),
-                cst.Arg(value=right),
-            ],
+            args=args,
         )
 
         new_statement = cst.Expr(value=new_call)
