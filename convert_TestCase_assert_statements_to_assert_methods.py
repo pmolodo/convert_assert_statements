@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!uv run
 # /// script
 # dependencies = ["libcst==1.8.6"]
 # requires-python = "==3.11.*"
